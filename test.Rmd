@@ -1,0 +1,51 @@
+---
+title: "Untitled"
+author: "Vincent Morin"
+date: "12/2/2019"
+output:
+  ioslides_presentation: default
+  beamer_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = F,error=F,comment = F)
+require(tidyverse)
+require(tidytext)
+require(lubridate)
+require(ggthemes)
+require(textdata)
+require(topicmodels)
+require(recipes)
+require(caret)
+```
+
+
+```{r, comment = "", include=FALSE}
+# Import Dataset
+Data = read_csv("Data/2016_Green_Weather_Data.csv") 
+
+```
+
+## Statement of Purpose
+
+**Goal:** Draw conclusions from analysis conducted on relationships between tips-per-ride of New York City's Green Taxi company and other variables such as weather, time/day, passengers, etc.. 
+
+```{r, include=TRUE, comment="", echo=FALSE}
+#Between all columns, sum all missing values (NAs) 
+sapply(Data, function(x) sum(is.na(x)))
+```
+
+some content
+
+
+### 
+
+#### A second level subheading
+
+- bullet 1
+- bullet 2
+
+1. Item a
+2. Item b
+
+

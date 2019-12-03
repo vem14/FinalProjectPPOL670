@@ -1,0 +1,209 @@
+---
+title: "Data Wrangling"
+author: "Vincent Morin"
+date: "12/2/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = F,error=F,comment = F)
+require(tidyverse)
+require(tidytext)
+require(lubridate)
+require(ggthemes)
+require(textdata)
+require(topicmodels)
+require(recipes)
+require(caret)
+```
+
+
+Import the dataset
+
+```{r}
+
+# Import Dataset
+GreenData = read_csv("Data/2016_Green_Taxi_Data.csv") 
+
+```
+
+
+Calculate time per trip in seconds, add as new variable. 
+
+```{r}
+GreenData <- GreenData %>% mutate(
+  Trip_Duration = 
+    Lpep_dropoff_datetime-lpep_pickup_datetime)
+
+
+
+GreenData %>% glimpse()
+```
+
+
+Add new variables
+
+```{r}
+
+GreenData$Pickup_hour <- 
+  hour(GreenData$lpep_pickup_datetime)
+
+
+
+
+GreenData$Pickup_day <- 
+  day(GreenData$lpep_pickup_datetime)
+
+
+
+
+GreenData$Pickup_week <-
+  hour(GreenData$lpep_pickup_datetime)
+
+
+
+
+GreenData %>% glimpse()
+```
+
+```{r}
+GreenData <- GreenData %>% mutate(
+  date = as.Date(GreenData$lpep_pickup_datetime))
+
+GreenData %>% glimpse()
+```
+
+
+
+Import weather data
+
+
+```{r}
+
+# Import Dataset
+WeatherData = read_csv("Data/weather_data_nyc_centralpark_2016.csv") 
+
+
+WeatherData %>% glimpse()
+```
+
+Need to clean weather data -- includes values "T" which stands for "trace" amounts.  Therefore, for this analysis, we will replace values of "T" with 0.01. 
+
+
+```{r}
+WeatherData1 <- WeatherData %>%
+  mutate(date = dmy(date),
+         Rain = as.numeric(
+           ifelse(
+             precipitation == "T", "0.01", precipitation)),
+         Snow_fall = as.numeric(
+           ifelse(
+             `snow fall` == "T", "0.01", `snow fall`)),
+         Snow_depth = as.numeric(
+           ifelse(
+             `snow depth` == "T", "0.01", `snow depth`)),
+         precipitation = Snow_fall + Rain,
+         has_snow = (Snow_fall > 0) | (Snow_depth > 0),
+         has_rain = Rain > 0,) %>%
+  select(-`snow fall`, -`snow depth`)
+
+
+
+WeatherData1 %>% glimpse()
+```
+
+Combine the two datasets, based on common variable of date. 
+
+```{r}
+Data <- inner_join(GreenData, WeatherData1, by="date")
+
+head(Data)
+```
+
+
+```{r}
+# Save new datafile
+
+Data %>% write_csv(path = "Data/2016_Green_Weather_Data.csv")
+
+
+
+```
+
+
+Split the data
+
+```{r}
+set.seed(333) 
+
+index = createDataPartition(Data$Tip_amount, p=.75,list=F) 
+
+train_data = Data[index,] # Use 75% of the data as training data 
+
+test_data = Data[-index,] # holdout 25% as test data
+
+```
+
+```{r}
+round(nrow(train_data)/nrow(Data),3)
+```
+
+
+
+
+```{r}
+plot1 <- train_data %>%
+  group_by(date) %>%
+  summarise(Tip = mean(Tip_amount)) %>%
+  ggplot(aes(date, Tip, color = date)) +
+  geom_jitter(show.legend = F)
+
+
+plot1
+```
+
+```{r}
+plot2 = train_data %>%
+  group_by(date, has_rain) %>%
+  summarise(Tip = mean(Tip_amount)) %>%
+  ggplot(aes(date, Tip, color = has_rain)) +
+  geom_jitter(show.legend = T)
+
+
+
+plot2
+
+```
+
+
+```{r}
+plot3 = train_data %>%
+  group_by(date, precipitation) %>%
+  summarise(Tip = mean(Tip_amount)) %>%
+  ggplot(aes(date, Tip, color = precipitation)) +
+  geom_jitter(show.legend = T)
+
+
+
+plot3
+
+```
+
+Recipes!
+
+```{r}
+train_data2 <- train_data %>% select(-Tip_amount, -date)
+```
+
+
+Recipe
+```{r}
+Green_recipe <- recipe(Tip_amount ~ ., data = train_data2) %>%
+  step_range(all_redictors()) %>%
+  prep()
+
+train_data3 <- bake(Green_recipe, train_data3)
+test_data3 <- bake(Green_recipe, test_data %>% select(-Tip_amount, -date))
+```
+
+

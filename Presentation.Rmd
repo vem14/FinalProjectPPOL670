@@ -30,6 +30,8 @@ Data = read_csv("Data/2016_Green_Weather_Data.csv")
 
 **Goal:** Draw conclusions from analysis conducted on relationships between tips-per-ride of New York City's Green Taxi company and other variables such as weather, time/day, passengers, etc.. 
 
+##
+
 ```{r, include=TRUE, comment="", echo=FALSE}
 #Between all columns, sum all missing values (NAs) 
 sapply(Data, function(x) sum(is.na(x)))

@@ -1,8 +1,8 @@
 ---
 title: "Data Wrangling"
 author: "Vincent Morin"
-date: "12/2/2019"
-output: pdf_document
+date: "12/3/2019"
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -18,192 +18,198 @@ require(caret)
 ```
 
 
-Import the dataset
+This file will handle the initial cleaning of the 2016 Green Taxi dataset.  This data is far too large to cooperate with the average system, and therefore will require considerable scaling, while minding the purpose of the project.
+
 
 ```{r}
-
 # Import Dataset
-GreenData = read_csv("Data/2016_Green_Taxi_Data.csv") 
+GreenTdata = read_csv("Data/2016_Green_Taxi_Trip_Data.csv") 
 
+
+
+
+# Use Glimpse to check dataset values. 
+GreenTdata %>% glimpse()
 ```
 
 
-Calculate time per trip in seconds, add as new variable. 
+Due to the size of the dataset, we'll consider extranneous high-level material to remove.  Removal criteria include: uncertainty/unknown descriptor, constant value, and location.  Sensitive to the constraint of the project, we'll make location of each ride a constant value; we'll assume all trips are out of New York, and that the New York Central Park weather data corresponds with the location. 
 
-```{r}
-GreenData <- GreenData %>% mutate(
-  Trip_Duration = 
-    Lpep_dropoff_datetime-lpep_pickup_datetime)
+**Trimming** 
 
+We'll begin by removing several columns which have constant values, unknown descriptors, or are otherwise irrelevant to the analysis.  Some columns which were removed include pickup and dropoff locations
 
-
-GreenData %>% glimpse()
-```
-
-
-Add new variables
-
-```{r}
-
-GreenData$Pickup_hour <- 
-  hour(GreenData$lpep_pickup_datetime)
-
-
-
-
-GreenData$Pickup_day <- 
-  day(GreenData$lpep_pickup_datetime)
-
-
-
-
-GreenData$Pickup_week <-
-  hour(GreenData$lpep_pickup_datetime)
-
-
-
-
-GreenData %>% glimpse()
-```
-
-```{r}
-GreenData <- GreenData %>% mutate(
-  date = as.Date(GreenData$lpep_pickup_datetime))
-
-GreenData %>% glimpse()
-```
-
-
-
-Import weather data
+These include:
+- VendorID
+- Store_and_fwd_flag
+- RateCodeID
+- Pickup_longitude
+- Pickup_latitude
+- Dropoff_longitutde
+- Dropoff_latitude
+- Ehail_fee
+- Trip_type
+- Payment_type
+- PULocationID
+- DOLocationID
 
 
 ```{r}
+# Remove several variables not relevant to goal. 
+GreenTdata2 <- select(GreenTdata, -VendorID, -Store_and_fwd_flag, 
+                      -RateCodeID, -Pickup_longitude, -Pickup_latitude, 
+                      -Dropoff_longitude, -Dropoff_latitude, -Ehail_fee, 
+                      -Trip_type, -Payment_type, -PULocationID, 
+                      -DOLocationID)
 
-# Import Dataset
-WeatherData = read_csv("Data/weather_data_nyc_centralpark_2016.csv") 
 
 
-WeatherData %>% glimpse()
+
+# Use Glimpse to check dataset values.
+GreenTdata2 %>% glimpse()
 ```
 
-Need to clean weather data -- includes values "T" which stands for "trace" amounts.  Therefore, for this analysis, we will replace values of "T" with 0.01. 
 
+Because we want our focus to be an analysis on riders who tippied, and due to the constraint of size and time, we will filter out all rows without tips. 
 
 ```{r}
-WeatherData1 <- WeatherData %>%
-  mutate(date = dmy(date),
-         Rain = as.numeric(
-           ifelse(
-             precipitation == "T", "0.01", precipitation)),
-         Snow_fall = as.numeric(
-           ifelse(
-             `snow fall` == "T", "0.01", `snow fall`)),
-         Snow_depth = as.numeric(
-           ifelse(
-             `snow depth` == "T", "0.01", `snow depth`)),
-         precipitation = Snow_fall + Rain,
-         has_snow = (Snow_fall > 0) | (Snow_depth > 0),
-         has_rain = Rain > 0,) %>%
-  select(-`snow fall`, -`snow depth`)
+# filter out rows where observation in variable Tip_amount
+# is equal to 0
+GreenTips <- GreenTdata2[GreenTdata2$Tip_amount != 0, ]
 
 
 
-WeatherData1 %>% glimpse()
+
+# Use Glimpse to check dataset values.
+GreenTips %>% glimpse()
 ```
 
-Combine the two datasets, based on common variable of date. 
-
-```{r}
-Data <- inner_join(GreenData, WeatherData1, by="date")
-
-head(Data)
-```
-
+We'll save trimmed data to a new .csv file for storage, and reproducibility. 
 
 ```{r}
 # Save new datafile
+GreenTips %>% write_csv(path = "Data/2016_Green_Taxi_TipsOnly.csv")
 
-Data %>% write_csv(path = "Data/2016_Green_Weather_Data.csv")
+```
 
+Read in new file.
 
+```{r}
+# Import Dataset
+GreenTips <- read_csv("Data/2016_Green_Taxi_TipsOnly.csv") 
 
 ```
 
 
-Split the data
+Before we begin to break down the dataset further, we'll want to capture the duration of each trip as a new variable. 
 
 ```{r}
-set.seed(333) 
+# Create new dataset to code off of
+GreenTips1 <- GreenTips
 
-index = createDataPartition(Data$Tip_amount, p=.75,list=F) 
 
-train_data = Data[index,] # Use 75% of the data as training data 
 
-test_data = Data[-index,] # holdout 25% as test data
 
+# Change lpep... from character type to datetime
+GreenTips1$lpep_pickup_datetime <- mdy_hms(
+  GreenTips$lpep_pickup_datetime)
+
+
+
+
+# Change Lpep... from character type to datetime
+GreenTips1$Lpep_dropoff_datetime <- mdy_hms(
+  GreenTips$Lpep_dropoff_datetime)
+
+
+
+
+# Use Glimpse to check dataset values.
+GreenTips1 %>% glimpse()
 ```
 
 ```{r}
-round(nrow(train_data)/nrow(Data),3)
+# Create new dataset to code off of
+GreenTips2 <- GreenTips1
+
+
+
+
+# Find difference between two variables in hours
+GreenTips2 <- GreenTips1 %>% mutate(
+ Trip_Duration = 
+  difftime(Lpep_dropoff_datetime, lpep_pickup_datetime, unit="hours"))
+
+
+
+
+# Convert Trip_Duration to numeric type. 
+GreenTips2$Trip_Duration <- as.numeric(GreenTips2$Trip_Duration)
+
+
+
+
+# Use Glimpse to check dataset values.
+GreenTips2 %>% glimpse()
 ```
 
+Next step will be to average observations across days -- each row corresponds with an individual taxi trip w/a tip.  There are several hundred per day.  In order to conduct analysis on this dataset, we'll aggregate the data, such that each new observation per day represents the averages of the variables associated. 
 
+This starts by manipulating our variable types. 
+
+We'll drop the lpep.. and Lpep... columns, and replace them with date variable.  
+
+```{r}
+# Mutate lpep... column from character type to date type
+# Create new variable. 
+GreenData <- GreenTips2 %>% mutate(
+  date = as.Date(GreenTips2$lpep_pickup_datetime)) %>%
+  select(-lpep_pickup_datetime, -Lpep_dropoff_datetime)
+
+
+
+
+# Use Glimpse to check dataset values.
+GreenData %>% glimpse()
+```
+
+The next thing we'll need to do, is average the data per day. 
 
 
 ```{r}
-plot1 <- train_data %>%
+GreenDaysData <- GreenData %>% mutate(
+  date = date(date)) %>%
   group_by(date) %>%
-  summarise(Tip = mean(Tip_amount)) %>%
-  ggplot(aes(date, Tip, color = date)) +
-  geom_jitter(show.legend = F)
+  summarize(Avg_Passengers = mean(Passenger_count), 
+            Avg_Distance = mean(Trip_distance),
+            Avg_Fare = mean(Fare_amount),
+            Avg_Extra = mean(Extra),
+            Avg_MTA_tax = mean(MTA_tax),
+            Avg_Tip = mean(Tip_amount),
+            Avg_Tolls = mean(Tolls_amount),
+            Avg_Surcharge = mean(improvement_surcharge),
+            Avg_Total = mean(Total_amount),
+            Avg_Duration = mean(Trip_Duration)
+)
 
 
-plot1
+
+GreenDaysData %>% glimpse()
 ```
+
+
+We'll save trimmed data to a new .csv file for storage, and reproducibility. 
 
 ```{r}
-plot2 = train_data %>%
-  group_by(date, has_rain) %>%
-  summarise(Tip = mean(Tip_amount)) %>%
-  ggplot(aes(date, Tip, color = has_rain)) +
-  geom_jitter(show.legend = T)
-
-
-
-plot2
+# Save new datafile
+GreenDaysData %>% write_csv(path = "Data/2016_Green_Taxi_Averages.csv")
 
 ```
 
+Read in new file.
 
 ```{r}
-plot3 = train_data %>%
-  group_by(date, precipitation) %>%
-  summarise(Tip = mean(Tip_amount)) %>%
-  ggplot(aes(date, Tip, color = precipitation)) +
-  geom_jitter(show.legend = T)
-
-
-
-plot3
+# Import Dataset
+GreenDaysData <- read_csv("Data/2016_Green_Taxi_Averages.csv") 
 
 ```
-
-Recipes!
-
-```{r}
-train_data2 <- train_data %>% select(-Tip_amount, -date)
-```
-
-
-Recipe
-```{r}
-Green_recipe <- recipe(Tip_amount ~ ., data = train_data2) %>%
-  step_range(all_redictors()) %>%
-  prep()
-
-train_data3 <- bake(Green_recipe, train_data3)
-test_data3 <- bake(Green_recipe, test_data %>% select(-Tip_amount, -date))
-```
-
-

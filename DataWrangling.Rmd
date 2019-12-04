@@ -2,7 +2,7 @@
 title: "Data Wrangling"
 author: "Vincent Morin"
 date: "12/3/2019"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -180,17 +180,19 @@ The next thing we'll need to do, is average the data per day.
 GreenDaysData <- GreenData %>% mutate(
   date = date(date)) %>%
   group_by(date) %>%
-  summarize(Avg_Passengers = mean(Passenger_count), 
+  summarize(Avg_Passengers = mean(Passenger_count),
             Avg_Distance = mean(Trip_distance),
             Avg_Fare = mean(Fare_amount),
             Avg_Extra = mean(Extra),
             Avg_MTA_tax = mean(MTA_tax),
             Avg_Tip = mean(Tip_amount),
+            Total_Tip = sum(Tip_amount),
             Avg_Tolls = mean(Tolls_amount),
             Avg_Surcharge = mean(improvement_surcharge),
             Avg_Total = mean(Total_amount),
-            Avg_Duration = mean(Trip_Duration)
-)
+            Avg_Duration = mean(Trip_Duration),
+            Total_Trips = (Total_Tip/Avg_Tip)) %>%
+  select(-Total_Tip)
 
 
 
@@ -213,3 +215,91 @@ Read in new file.
 GreenDaysData <- read_csv("Data/2016_Green_Taxi_Averages.csv") 
 
 ```
+
+
+
+
+Next, we'll want to import our additional dataset: New York 2016 Central Park Weather. 
+
+```{r}
+# Import Dataset
+WeatherData = read_csv("Data/weather_data_nyc_centralpark_2016.csv") 
+
+```
+
+
+First, we'll take a look at the new data, and look for any inconsistencies or missing values.
+
+```{r}
+# Use Glimpse to check dataset values. 
+WeatherData %>% 
+  summarize_all(class) %>% 
+  glimpse()
+```
+
+```{r}
+# Check for missing values among the numeric variables.
+sum(is.na(WeatherData))
+```
+
+Luckily there are no missing values, however, there are some odd results in the data.  For example, on days with trace amounts of precipitation, the observation will contain a value of "T".  To be mindful of this, we'll convert all "T"s to values of 0.01.  Additionally, we'll take this opportunity to convert some column types to better fit our other dataset. 
+
+
+```{r}
+WeatherData1 <- WeatherData %>%
+  mutate(date = dmy(date),
+         Rain = as.numeric(
+           ifelse(
+             precipitation == "T", "0.01", precipitation)),
+         Snow_fall = as.numeric(
+           ifelse(
+             `snow fall` == "T", "0.01", `snow fall`)),
+         Snow_depth = as.numeric(
+           ifelse(
+             `snow depth` == "T", "0.01", `snow depth`)),
+         precipitation = Snow_fall + Rain#,
+         #has_snow = (Snow_fall > 0) | (Snow_depth > 0),
+         #has_rain = Rain > 0,) %>%
+  ) %>%
+  select(-`snow fall`, -`snow depth`)
+
+
+
+WeatherData1 %>% glimpse()
+```
+
+
+At this point, we can merge our datasets using inner_join, with the mutual column of "date". 
+
+```{r}
+# Use inner_join to combine both datasets around
+# variable, "date". 
+# Assign to new dataset, "Data". 
+Data <- inner_join(GreenDaysData, WeatherData1, by="date")
+
+
+
+
+# Use Glimpse to check dataset values. 
+Data %>% glimpse()
+```
+
+Et viola -- we've created our dataset.  We'll save this data into a new file. 
+
+```{r}
+# Save new data file
+ Data %>% write_csv(path = "Data/2016_Green_Weather_Data.csv")
+
+```
+
+```{r}
+# Import Dataset
+Data = read_csv("Data/2016_Green_Weather_Data.csv") 
+
+```
+
+
+
+
+
+

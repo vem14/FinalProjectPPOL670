@@ -1,0 +1,18 @@
+---
+title: "MachineLearning"
+author: "Vincent Morin"
+date: "12/3/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Import training and test datasets. 
+train_data2 <- read_csv(path = "Data/Train_Data.csv")
+
+test_data2 <- read_csv(path = "Data/Test_Data.csv")
+
+```

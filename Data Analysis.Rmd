@@ -1,0 +1,204 @@
+---
+title: "New File"
+author: "Vincent Morin"
+date: "12/3/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = F,error=F,comment = F)
+require(tidyverse)
+require(tidytext)
+require(lubridate)
+require(ggthemes)
+require(textdata)
+require(topicmodels)
+require(recipes)
+require(caret)
+```
+
+```{r}
+# Import Dataset
+Data = read_csv("Data/2016_Green_Weather_Data.csv") 
+
+```
+
+This file will handle the data analysis portion of the Final Project. 
+
+We'll begin by splitting the data into test and training datasets with equal proportions of 75% and 25%, respectively. 
+
+Additionally, we'll ensure the training data proportion is correct by doing a quick calculation. 
+
+```{r}
+# Set seed for reproducibility. 
+set.seed(333) 
+
+
+
+
+# Indexing - used parse data into proportions. 
+index = createDataPartition(Data$Avg_Tip, p=.75,list=F) 
+
+
+
+
+# Use 75% of the data as training data 
+train_data = Data[index,]
+
+
+
+
+# Use 25% of the data as testing data. 
+test_data = Data[-index,]
+
+
+
+
+# Calculate proportion of training data
+# relative to total data. 
+# Should be ~ 0.75. 
+round(nrow(train_data)/nrow(Data),3)
+
+```
+
+We'll begin by exploring our data. 
+
+```{r}
+# Use Glimpse to check dataset values. 
+train_data %>% 
+  summarize_all(class) %>% 
+  glimpse()
+```
+
+At this point, our data is mostly numeric.  We should also check information on our date range. 
+
+```{r}
+# Print a brief summary of # of observations, 
+# min date, and max date. 
+
+train_data %>% summarize( 
+  min_date = min(date), 
+  max_date = max(date))
+
+```
+
+We'll also check to see if there are any missing values (NAs) in the dataset. 
+
+```{r}
+# Check for missing values among the numeric variables.
+sum(is.na(train_data))
+```
+
+There are no missing values in the dataset. 
+
+Next, we'll print an illustration (histograms) to see the distribution of our variables. 
+
+```{r}
+# Print histograms of distributions of variables. 
+train_data_plot = train_data %>% 
+  select_if(is.numeric) %>% 
+  gather(var,val) %>% 
+  ggplot(aes(val,group=var)) + 
+  geom_histogram(bins = 30) +
+  facet_wrap(~var,scales="free",ncol=2)
+
+
+
+
+# Save illustration to a png file, "train_data_plot.png"
+ggsave(
+  train_data_plot, 
+  filename = "Images/train_data_plot.png", 
+  device = "png",
+  width = 25, 
+  height = 50, 
+  limitsize = FALSE, 
+  dpi = 300 )
+
+
+
+
+# Print results
+print(train_data_plot)
+```
+
+Most of the data is distributed relatively normally. 
+
+A unique example of an exception to this is: Avg_Extra. 
+
+```{r}
+# Print histogram of Avg_Extra. 
+Avg_Extra_plot = train_data %>% 
+  select(Avg_Extra) %>% 
+  gather(var,val) %>% 
+  ggplot(aes(val,group=var)) + 
+  geom_histogram(bins = 30) +
+  facet_wrap(~var,scales="free",ncol=2)
+
+
+
+
+# Save illustration to a png file, "Avg_Extra_plot"
+ggsave(
+  Avg_Extra_plot, 
+  filename = "Images/Avg_Extra_plot.png", 
+  device = "png",
+  width = 25, 
+  height = 50, 
+  limitsize = FALSE, 
+  dpi = 300 )
+
+
+
+
+# Print results
+print(Avg_Extra_plot)
+```
+
+Next, we'll consider additional predictor variables to derive from the data. 
+
+To start, we'll utilize what information we have on the date, to create a few new variables:
+
+- Day of the week,
+- Day of the month,
+- Week of year,
+- Weekday - True or False, 
+- Month.
+
+This will be done using the lubridate package. 
+
+```{r}
+train_data1 <- train_data %>%
+  mutate(Day_of_Week = 
+           wday(train_data$date),
+         Day_of_Month = 
+           month(train_data$date),
+         Week = 
+           week(train_data$date), 
+         Month = 
+           month(train_data$date), 
+         Weekday = ifelse(
+           Day_of_Week > 1 & 
+             Day_of_Week < 7, 
+           "TRUE", "FALSE")
+         )
+         
+
+
+
+# Use Glimpse to check dataset values. 
+train_data1 %>% head()
+```
+
+
+```{r}
+# Average Pickups Per Day
+Average_Trips_Day_plot <- train_data1[, list(mean_trips_by_day = mean("Total_Trips")), by = Day_of_Week] %>%
+  ggplot(aes(x = Day_of_Week, y = mean_trips_by_day)) +
+  geom_bar(stat = "identity", fill = color) +
+  labs(x = "Day of the Week", y = "Average Trips", title = "Average Trips by Day of Week")
+
+
+print(Average_Trips_Day_plot)
+```
+
